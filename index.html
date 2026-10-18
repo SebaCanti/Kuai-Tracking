@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kuai Tracking 快追踪</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b0f10">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira:wght@400;500;600;700&family=Share+Tech+Mono&family=Noto+Sans+SC:wght@500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><b>KUAI TRACKING</b><b class="cn">快追踪</b><span id="weekNo" class="weekno"></span></div>
+  <div class="search">
+    <span class="search-ico">⌕</span>
+    <input id="q" type="search" autocomplete="off" placeholder="Search container, client, vessel, variety, grower…">
+    <span id="qhint" class="qhint"></span>
+  </div>
+  <div class="actions">
+    <span id="viewBadge" class="viewbadge" hidden></span>
+    <label class="btn ghost edit-only" for="file">Upload file</label>
+    <input id="file" type="file" accept=".csv,.xlsx" multiple hidden>
+    <button id="saveBtn" class="btn hot edit-only" type="button">Save now</button>
+    <small id="lastSave" class="lastsave">Not saved yet</small>
+    <button id="setBtn" class="btn gear edit-only" type="button" aria-expanded="false" aria-controls="settings">⚙ Settings</button>
+  </div>
+  <section id="settings" class="settings" hidden aria-label="Settings">
+    <div class="set-row">
+      <div>
+        <b>Edit mode</b>
+        <p>When ON you can edit cells. When OFF the tables are locked so nothing gets overwritten by accident.</p>
+      </div>
+      <button id="editSwitch" class="switch" type="button" role="switch" aria-checked="false"><span class="knob"></span><span class="lbl">OFF</span></button>
+    </div>
+    <div class="set-row col" id="pubBox">
+      <div>
+        <b>Phone link</b>
+        <p>Publishes an encrypted copy every 10 minutes so you can view it on your phone from any network. Only someone with the password can read it.</p>
+      </div>
+      <div class="pub-form">
+        <input id="pubToken" type="password" autocomplete="off" placeholder="GitHub token (github_pat_…)">
+      </div>
+      <div class="pub-form">
+        <input id="pubPw" type="password" autocomplete="new-password" placeholder="Password for the phone (min. 6 characters)">
+        <button id="pubSave" class="btn hot" type="button">Save &amp; publish</button>
+      </div>
+      <div class="pub-status" id="pubStatus">Not set up yet.</div>
+      <div class="pub-link" id="pubLinkRow" hidden><span id="pubLink"></span><button id="pubCopy" class="btn ghost" type="button">Copy link</button></div>
+      <div class="set-row"><span class="dnote">Publishing</span><button id="pubSwitch" class="switch" type="button" role="switch" aria-checked="false"><span class="knob"></span><span class="lbl">OFF</span></button></div>
+    </div>
+    <div class="set-row">
+      <div>
+        <b>File history</b>
+        <p>Every file uploaded or downloaded, with its date. They stay available to download again.</p>
+      </div>
+      <button id="histBtn" class="btn ghost" type="button">File history</button>
+    </div>
+    <div class="set-row info">
+      <div>
+        <b>Version</b>
+        <p>Kuai Tracking <b id="appVersion" class="ver"></b>. It goes up by one with every change, so you can check you are on the latest one.</p>
+      </div>
+    </div>
+    <div class="set-row info">
+      <div>
+        <b>Automatic saves</b>
+        <p>Every day at 10:00 and 22:00 both tables are saved as CSV in the Kuai Tracking\Saves folder, as long as the app is running.</p>
+      </div>
+    </div>
+  </section>
+</header>
+<div id="lockbar" class="lockbar">🔒 Edit mode is OFF. Turn it on in Settings to edit cells.</div>
+<div id="qresults" class="qresults" hidden></div>
+
+<nav class="tabs" role="tablist">
+  <button class="tab on" data-tab="containers" role="tab"><span>Tracking</span><small>追踪</small></button>
+  <button class="tab" data-tab="daily" role="tab"><span>Daily Sales</span><small>每日销售</small></button>
+  <button class="tab" data-tab="total" role="tab"><span>Total Sales</span><small>总销售</small></button>
+</nav>
+
+<div class="layout">
+  <aside class="rail" aria-label="Containers by species">
+    <h3>Containers by species <span class="cn">品类</span></h3>
+    <div id="rail"></div>
+  </aside>
+  <main>
+    <!-- Containers -->
+    <section id="tab-containers" class="panel">
+      <div class="toolbar">
+        <div id="chips" class="chips"></div>
+        <span id="count" class="count"></span>
+        <button id="cExport" class="btn ghost" type="button">Export CSV</button>
+        <button class="btn ghost clearf" data-clearall="c" type="button">Clear all filters</button>
+        <span class="phone-only ssbox"><button id="ssBtn" class="btn ghost" type="button">Sales Start</button></span>
+      </div>
+      <div class="scroller">
+        <table id="ctable" class="grid">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="cfoot" class="tfoot"></div>
+    </section>
+
+    <!-- Daily Sales -->
+    <section id="tab-daily" class="panel" hidden>
+      <div class="toolbar">
+        <span id="dTodayLabel" class="todaylbl"></span>
+        <button id="dImport" class="btn ghost edit-only" type="button" title="Brings today's openings and the containers still selling from Containers">Import Containers</button>
+        <button id="dAdd" class="btn ghost edit-only" type="button">Add row</button>
+        <span class="spacer"></span>
+        <span id="dSel" class="count"></span>
+        <button id="dCopy" class="btn hot" type="button" disabled>Copy for WeChat</button>
+        <button id="dDel" class="btn danger edit-only" type="button" disabled>Delete</button>
+      </div>
+      <div id="fcAlert" class="fcbar" hidden></div>
+      <div class="scroller">
+        <table id="dtable" class="grid daily">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="dfoot" class="tfoot"></div>
+      <div id="addDlg" class="dlg-wrap" hidden>
+        <form id="adForm" class="dlg">
+          <b class="dlg-title">Add row</b>
+          <label for="adCode">Vessel code</label>
+          <input id="adCode" autocomplete="off" placeholder="e.g. 0009">
+          <div class="dlg-check" role="radiogroup" aria-label="Transportation">
+            <label><input type="radio" name="adT" value="M" checked> Sea (M)</label>
+            <label><input type="radio" name="adT" value="A"> Air (A)</label>
+          </div>
+          <div id="adPreview" class="dlg-preview"></div>
+          <div class="dlg-foot"><button id="adCancel" type="button" class="btn ghost">Cancel</button><button type="submit" class="btn hot">Add</button></div>
+        </form>
+      </div>
+      <div id="dEmpty" class="empty" hidden></div>
+    </section>
+
+    <!-- Total Sales -->
+    <section id="tab-total" class="panel" hidden>
+      <div class="toolbar">
+        <span class="todaylbl">All sales, every day</span>
+        <button id="tRefresh" class="btn ghost" type="button">Refresh</button>
+        <button id="tCompare" class="btn hot" type="button">Comparison</button>
+        <button id="tExport" class="btn ghost" type="button">Export CSV</button>
+        <button id="tExportCL" class="btn ghost" type="button">Export CSV Chile</button>
+      </div>
+      <div id="tAlert" class="fcbar" hidden></div>
+      <div class="scroller">
+        <table id="ttable" class="grid daily total">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="tfoot" class="tfoot"></div>
+    </section>
+  </main>
+</div>
+
+<!-- Commands drawer -->
+<!-- side tabs (right edge) -->
+<div class="sidetabs">
+  <button class="sidetab" data-panel="progPanel" type="button"><span>Cherry Program 2026-2027</span><span class="cn">樱桃计划</span></button>
+  <button class="sidetab phone-only" data-panel="pfPanel" type="button"><span>Pallet Finder</span><span class="cn">托盘查找</span></button>
+  <button class="sidetab phone-only" data-panel="notesPanel" type="button"><span>Notes</span><span class="cn">笔记</span></button>
+  <button class="sidetab" data-panel="adjPanel" type="button"><span>Load Allocation</span><span class="cn">分配</span></button>
+</div>
+<section id="progPanel" class="sidepanel" hidden aria-label="Cherry Program 2026-2027">
+  <div class="sp-head"><b>CHERRY PROGRAM 2026-2027 <span class="cn">樱桃计划</span></b><button class="x sp-close" type="button" aria-label="Close">×</button></div>
+  <div id="progBody"></div>
+</section>
+<section id="pfPanel" class="sidepanel" hidden aria-label="Pallet Finder">
+  <div class="sp-head"><b>PALLET FINDER <span class="cn">托盘查找</span></b><button class="x sp-close" type="button" aria-label="Close">×</button></div>
+  <div><input id="pfInput" class="pf-input" type="search" inputmode="numeric" placeholder="🔍 Pallet number (or part of it)" autocomplete="off" aria-label="Pallet number"><div id="pfResults" class="pf-results"></div></div>
+</section>
+<section id="notesPanel" class="sidepanel" hidden aria-label="Notes">
+  <div class="sp-head"><b>NOTES <span class="cn">笔记</span></b><button class="x sp-close" type="button" aria-label="Close">×</button></div>
+  <div><textarea id="notesText" class="notes" placeholder="Write here. Hold a cell to copy it, then hold here to paste."></textarea></div>
+</section>
+<section id="adjPanel" class="sidepanel" hidden aria-label="Load Allocation">
+  <div class="sp-head"><b>LOAD ALLOCATION <span class="cn">分配</span></b><button class="x sp-close" type="button" aria-label="Close">×</button></div>
+  <div id="adjBody"></div>
+</section>
+<section id="cmpPanel" class="sidepanel" hidden aria-label="Comparison">
+  <div class="sp-head"><b>COMPARISON · FRUIT COLOR VS OTHER CLIENTS</b><button class="x sp-close" type="button" aria-label="Close">×</button></div>
+  <div id="cmpBody"></div>
+</section>
+
+<div id="toast" class="toast" hidden></div>
+<div id="todayBadge" class="today-badge" aria-label="Today"></div>
+
+<!-- upload summary -->
+<div id="upDlg" class="dlg-wrap" hidden>
+  <div class="dlg" role="dialog" aria-labelledby="upTitle">
+    <b class="dlg-title" id="upHead">Check before loading</b>
+    <div id="upTitle" class="dnote"></div>
+    <div id="upBody"></div>
+    <div class="dlg-foot"><button id="upCancel" type="button" class="btn ghost">Cancel</button><button id="upOk" type="button" class="btn hot">Load data</button></div>
+  </div>
+</div>
+
+<!-- password screen for the phone link -->
+<div id="gate" class="gate" hidden>
+  <form id="gateForm" class="gate-box">
+    <div class="brand"><b>KUAI TRACKING</b><b class="cn">快追踪</b></div>
+    <p>Enter the password to view the containers.</p>
+    <input id="gatePw" type="password" autocomplete="current-password" placeholder="Password">
+    <button class="btn hot" type="submit">Open</button>
+    <div id="gateErr" class="gate-err" hidden></div>
+  </form>
+</div>
+
+<script src="commands.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
